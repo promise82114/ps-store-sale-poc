@@ -1,15 +1,15 @@
 # POC-01 實作與驗證報告
 
-## 目前結論：INCONCLUSIVE（Task 03–05 尚待完整雲端驗收）
+## 最終結論：PASS（POC-01 Task 01–05）
 
-Task 01 腳手架與 Task 02 單頁診斷已在 GitHub-hosted runner 通過，兩次 Run 的 artifact 均已實際下載並核對。Task 03、04 已沿用現有程式實作完整分頁與商品輸出，必要離線測試已通過；Task 05 正在補齊完整模式的雲端證據。下方保留先前單頁實測記錄。
+沿用現有專案及 Task 01、02 已驗證的公開查詢，Task 03–05 已完成完整分頁、JSON 輸出與雲端實測報告。先在本機完成 52 項離線測試，再由 GitHub-hosted runner 未登入取得全部活動商品，完整 JSON 已實際從 Actions artifact 下載並核對。下方保留先前單頁實測記錄，完整模式證據另列於後。
 
 | 項目 | 本機驗證 | GitHub-hosted runner |
 |---|---|---|
 | Task 01 環境檢查 | PASS | PASS，診斷 artifact 已下載核對 |
 | Task 02 第一頁 | PASS，HTTP 200，24 筆有效商品 | PASS，HTTP 200，24 筆有效商品 |
-| 完整分頁與 JSON | 離線合成資料 PASS；未執行本機完整活動抓取 | 待執行 |
-| 完整 Artifact 下載驗證 | 未取得雲端完整檔案 | 待執行 |
+| 完整分頁與 JSON | 52 項離線測試 PASS；未執行本機完整活動抓取 | PASS，96 頁，唯一商品 2304 筆 |
+| 完整 Artifact 下載驗證 | 已下載雲端 artifact 並獨立核對 JSON | PASS，完整 JSON 及診斷報告可下載 |
 
 ## 本機實測記錄
 
@@ -93,6 +93,62 @@ Task 02 共 4 次請求（官方活動 HTML、2 份公開腳本、GraphQL 第一
 
 ### GitHub-hosted runner 完整抓取
 
-待執行 `mode=full`，下載 artifact 後記錄 Run、commit、時間、各頁狀態、商品原始／唯一／重複數、耗時、錯誤、首尾重驗及完整 JSON 下載檢核結果。
+| 項目 | 實測結果 |
+|---|---|
+| Run | [39386581449](https://github.com/promise82114/ps-store-sale-poc/actions/runs/39386581449)，`workflow_dispatch`、`mode=full`、success |
+| 程式 commit | `3e7dafc41380579e213c00a6018034b9fd151de5`，`main` |
+| Runner | GitHub-hosted Linux x64，Node.js v24.21.0 |
+| 執行時間 | 2026-10-20T07:27:11.069Z 至 07:28:26.288Z（Asia/Taipei 15:27:11 至 15:28:26） |
+| 耗時 | 整體診斷 75,219ms；分頁及首尾重驗 73,637ms |
+| 來源與查詢 | 上述台灣活動 URL；`categoryGridRetrieve`，當次重新提取官方定義並計算 hash |
+| 當次 hash | `88c0b9a1273c6d320c51cd73e390924e21ae28bf09f01cde8b84b1034b16cd03` |
+| 活動頁數 | 96 頁；offset 由 0 推進至 2280，當次各頁 size=24 |
+| 當次 totalCount | 2304，各頁及首尾重驗一致；不是硬編碼驗收常數 |
+| 結束資訊 | 首頁 `isLast=false`；末頁 `offset=2280`、`size=24`、`isLast=true`、回傳 24 筆 |
+| 原始／唯一／重複 | 2304／2304／0，重複 ID 數 0 |
+| 輪次與首尾重驗 | 1 輪 accepted；另重驗 offset 0、2280，HTTP 200、總數及商品 ID 順序相同，boundaryVerification=PASS |
+| HTTP 請求 | 101 次：活動 HTML 1、官方公開腳本 2、商品分頁 96、首尾重驗 2；全部 HTTP 200 |
+| 重試／錯誤 | retryCount=0、error=null；沒有捨棄輪次或失敗頁面 |
+| 認證 | authenticationUsed=false；不送 PSN Cookie、Authorization、帳密或私人 Token |
+| 結論 | fullValidation=PASS、conclusion=PASS、complete=true |
 
-完整模式通過前，整體結論維持 INCONCLUSIVE。此 POC 不提交正式公開商品 JSON，也不開始 POC-02、POC-03 或正式網站。
+雲端的安裝、52 項離線測試、完整診斷、Summary 寫入及 artifact 上傳步驟均成功。
+完整抓取只執行了此 GitHub-hosted Run；本機只做離線測試、商品網址規則探測，以及下載結果的獨立檢核。
+
+### 完整 Artifact 與 JSON 下載驗證
+
+- Artifact：[poc01-full-39386581449-1](https://github.com/promise82114/ps-store-sale-poc/actions/runs/39386581449/artifacts/12247218682)，ID `12247218682`，上傳封裝大小 967,529 bytes，保留 7 天。
+- 已實際下載並解析 `bootstrap.json`、`fetch-report.json`、`POC_REPORT.md`、`sale-products.json`。未出現 `partial-products.json`。
+- 完整商品 JSON 大小 7,046,941 bytes；SHA-256：`062bda52b252d5a3a6629ba22b1345faef4a079bf0d18be298c21d449c659dfd`。
+- 已核對 `schemaVersion=1`、saleId、`locale=zh-hant-tw`、fetchedAt、`scope=full-activity`、`complete=true`、totalCount、reportedTotalCount 及 products。
+- 獨立計算 JSON products 長度及 Product ID 唯一數，均為 2304，與 report 原始／唯一筆數一致；每筆 ID／名稱非空，`key=locale:id`。
+- 另逐頁核對 96 頁 offset 連續性、size、當次 totalCount、回傳筆數、isLast 與 HTTP 200；覆蓋商品筆數合計 2304，兩份首尾重驗紀錄均通過。
+- 2304 筆都有商品 URL、價格物件及圖片 URL。價格物件內 basePrice、discountedPrice 均有值；2281 筆 discountText 有值，23 筆為 API 原值 null，沒有捏造折扣。
+- 商品 URL 全部標示 `urlSource=verified-product-route`；圖片及價格來自當次 API。未逐筆另發商品頁請求。
+- 已檢查商品及報告未含 Cookie、Authorization、password、access_token、refresh_token 或 PSN Token 等憑證欄位；認證狀態為 false。
+- 本機下載副本位於 `.local/cloud-full/`，被 `.gitignore` 排除；Repo 只提交程式、測試與文字報告，沒有提交活動商品 JSON。
+
+### 驗收對照
+
+| 條件 | 結果與證據 |
+|---|---|
+| AC-01 GitHub-hosted runner | PASS，完整模式 Run 及報告標示 githubHostedRunner=true |
+| AC-02 無登入 | PASS，公開請求固定標頭、credentials=omit，報告 authenticationUsed=false，產物無憑證欄位 |
+| AC-03 首頁資料 | PASS，Task 02 及完整模式均有有效商品 ID、名稱與 pageInfo |
+| AC-04 分頁完整性 | PASS，96 頁連續覆蓋、原始與唯一數等於當次總數、末頁 isLast=true、首尾重驗通過 |
+| AC-05 商品識別 | PASS，2304 個 Product ID 唯一；離線測試確認同名及同 npTitleId 不合併不同商品 ID |
+| AC-06 去重報告 | PASS，原始 2304、唯一 2304、重複 0；離線重複案例有筆數及出現次數紀錄 |
+| AC-07 JSON 輸出 | PASS，完整 JSON 可解析且 schemaVersion=1，必要欄位通過，缺少折扣保留 null |
+| AC-08 失敗保護 | PASS（離線測試）；驗證分頁／重驗／HTTP 失敗均非零、清除舊完整檔並分離 partial；未對正式服務刻意製造雲端 403 或失敗 |
+| AC-09 安全與權限 | PASS，僅手動觸發、contents:read、無 PSN Secrets、不由 runner commit 商品 JSON 或部署 Pages |
+| AC-10 可重現性 | PASS，README 已列 full 模式與下載步驟；此 Run 的 artifact 已實際下載核對 |
+
+### 結論與實測界線
+
+**PASS**：本次指定台灣活動已由未登入的 GitHub-hosted runner 取得完整且可驗證的商品清單，滿足 POC-01 的問題與 Task 03–05 驗收。
+
+此結果限於本活動、本次服務狀態及上述程式版本；官方 hash／腳本打包或存取政策改變時仍須重新驗證，程式會在無法使用查詢或遭拒時停止。
+總數、唯一 ID、分頁覆蓋與首尾重驗提供一致性證據，但 API 未提供固定時間點快照，不能保證抓取期間中間頁的所有欄位完全沒有變動。
+Artifact 是保留 7 天的測試產物，不是正式持久資料或公開發佈。正式公開使用條件未在本 POC 評估。
+
+本次工作到 POC-01 結束；未啟動 POC-02、POC-03、正式網站、IndexedDB 或個人分類功能。
