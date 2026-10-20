@@ -1,13 +1,13 @@
 # POC-01 Task 01 / Task 02 實作與驗證狀態
 
-## 目前結論：INCONCLUSIVE（尚待 GitHub-hosted runner）
+## 目前結論：PASS（僅 Task 01 / Task 02）
 
-Task 01 腳手架與 Task 02 單頁診斷已實作。本機成功不代替 GitHub Actions 驗收；目前尚無雲端 Run URL，也尚未確認可下載的 Actions artifact。Task 03–05 未開始。
+Task 01 腳手架與 Task 02 單頁診斷已在 GitHub-hosted runner 通過，兩次 Run 的 artifact 均已實際下載並核對。此結果只證明環境流程及未登入取得第一頁商品；完整分頁與 Task 03–05 未開始。
 
 | 項目 | 本機驗證 | GitHub-hosted runner |
 |---|---|---|
-| Task 01 環境檢查 | PASS | 未執行 |
-| Task 02 第一頁 | PASS，HTTP 200，24 筆有效商品 | 未執行 |
+| Task 01 環境檢查 | PASS | PASS，診斷 artifact 已下載核對 |
+| Task 02 第一頁 | PASS，HTTP 200，24 筆有效商品 | PASS，HTTP 200，24 筆有效商品 |
 | 完整分頁 | 未執行，不在此次範圍 | 未執行 |
 
 ## 本機實測記錄
@@ -30,7 +30,7 @@ Task 01 腳手架與 Task 02 單頁診斷已實作。本機成功不代替 GitHu
 - CLI 環境模式：成功，未請求 PS Store；非法網址：exit 1、零請求、留下原因報告並清除舊商品檔。
 - Workflow YAML 解析與必要設定檢查通過：僅手動觸發、唯讀權限、hosted runner、逾時、失敗亦上傳 artifact、action commit 固定、輸入透過環境變數傳遞。
 - `git diff --check` 通過；診斷產物、下載暫存與 node_modules 均被忽略。
-- 以上屬本機測試及靜態檢查，尚未驗證 GitHub Actions 實際執行、Summary 或 artifact 上傳／下載。
+- 以上是本機檢查；GitHub Actions 的執行及 artifact 驗收另列於下方。
 
 ## 查詢證據及限制
 
@@ -42,20 +42,31 @@ Task 01 腳手架與 Task 02 單頁診斷已實作。本機成功不代替 GitHu
 
 開發時先發現新版 GraphQL 列印格式與官方不同，計算出的 hash 被回覆 HTTP 400 `not whitelisted`；依官方單行參數及結尾換行格式修正後，再補上公開 API 要求的一般 JSON Content-Type 標頭，最終單頁成功。未嘗試替代代理、登入憑證或封鎖繞過。
 
-執行時從當前官方頁面重新提取定義；此記錄與測試 fixture 都不作為失敗 fallback。若官方查詢／打包／hash 算法改動，應停止並人工核對。尚未驗證完整分頁、抓取期間總數穩定性、GitHub runner 網路來源或正式公開使用限制。
+執行時從當前官方頁面重新提取定義；此記錄與測試 fixture 都不作為失敗 fallback。若官方查詢／打包／hash 算法改動，應停止並人工核對。尚未驗證完整分頁、抓取期間總數穩定性或正式公開使用限制。
 
-## 雲端驗收待填
+## GitHub-hosted runner 實測
 
-1. Push 本 POC 後，以預設分支手動執行 `environment`，記錄 Run URL、時間及 artifact。
-2. 手動執行 `first-page`，記錄 Run URL、HTTP 狀態、商品筆數、pageInfo 及錯誤分類。
-3. 僅第一頁雲端通過時，將 Task 02 標為 PASS；403、認證或查詢失效則停止；暫時網路錯誤等標為 INCONCLUSIVE。
+兩次均為 `workflow_dispatch`，執行程式 commit 為 `18922b4f7d6faabea01c0956df599363a60079ee`，分支 `main`。
+Checkout、依賴安裝、25 項離線測試、診斷、Summary 寫入與 artifact 上傳步驟均成功。
 
-| 欄位 | 待填值 |
+| 欄位 | 實測值 |
 |---|---|
-| Task 01 Run URL / artifact | 未執行 |
-| Task 02 Run URL / artifact | 未執行 |
-| GitHub runner / UTC 時間 | 未執行 |
-| API HTTP / pageInfo / 商品數量 | 未執行 |
-| Task 01 / Task 02 結論 | 尚未完成雲端驗收 |
+| Task 01 Run | [39384561665](https://github.com/promise82114/ps-store-sale-poc/actions/runs/39384561665)，success |
+| Task 01 artifact | `poc01-environment-39384561665-1`，ID `12246986427`，已下載核對 |
+| Task 01 診斷時間 | 2026-10-20T07:08:18.509Z 至 07:08:18.510Z（台北 15:08） |
+| Task 01 環境 | Linux x64、Node.js v24.21.0、`githubHostedRunner=true` |
+| Task 01 結果 | `environmentCheck=PASS`、零 PS Store 請求；API 未執行，故該份報告的 `conclusion=INCONCLUSIVE` 符合設計 |
+| Task 02 Run | [39384708364](https://github.com/promise82114/ps-store-sale-poc/actions/runs/39384708364)，success |
+| Task 02 artifact | `poc01-first-page-39384708364-1`，ID `12247120220`，已下載核對 |
+| Task 02 診斷時間 | 2026-10-20T07:09:53.743Z 至 07:09:55.635Z（台北 15:09） |
+| Task 02 環境 | Linux x64、Node.js v24.22.0、`githubHostedRunner=true` |
+| Task 02 API / pageInfo | HTTP 200；`offset=0`、`size=24`、`totalCount=2304`、`isLast=false` |
+| Task 02 商品數量 | 原始 24、唯一 ID 24、重複 0；ID 及名稱驗證通過 |
+| Task 02 結果 | `firstPageValidation=PASS`、`conclusion=PASS`、`authenticationUsed=false`、`error=null` |
+| Task 01 / Task 02 結論 | PASS；尚未取得後續頁面，所有商品產物仍為 `complete=false` |
+
+Task 02 共 4 次請求（官方活動 HTML、2 份公開腳本、GraphQL 第一頁），均為首次 HTTP 200、沒有重試；GraphQL 耗時 581ms。
+雲端當次 hash 與上述本機實測相同。已核對下載的報告之 Run URL、hosted runner 標記及認證狀態，並核對商品檔筆數、唯一鍵與 `scope=first-page-only`。
+下載副本保存在本機忽略追蹤的 `.local/cloud-environment/`、`.local/cloud-first-page/`；Repo 僅提交此文字記錄，商品資料仍由 artifact 提供，保留 7 天。
 
 重現及 artifact 判讀步驟見 [README](../README.md)。

@@ -65,4 +65,4 @@ Workflow 僅 `workflow_dispatch`、`contents: read`，使用 GitHub-hosted `ubun
 不設定排程、push 觸發、Repo secrets、PAT、寫入權限、JSON commit、Pages 部署或正式專案操作。Actions 固定到已核對的官方 action commit。
 報告與本機下載的診斷資料均被 `.gitignore` 排除。
 
-目前實測與待完成雲端驗收見 [docs/POC_REPORT.md](docs/POC_REPORT.md)。
+Task 01、Task 02 已於 GitHub-hosted runner 通過，Run 連結與 artifact 驗證結果見 [docs/POC_REPORT.md](docs/POC_REPORT.md)。
