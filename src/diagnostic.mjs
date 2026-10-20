@@ -41,8 +41,11 @@ export async function discoverQuery(get, sourceUrl, report) {
   throw new DiagnosticError('QUERY_UNAVAILABLE', 'query-discovery');
 }
 
-export function apiUrl(sha256Hash) {
-  const variables = { id: saleId, pageArgs: { size: pageSize, offset: 0 },
+export function apiUrl(sha256Hash, offset = 0, size = pageSize) {
+  if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(size) || size < 1 || size > pageSize) {
+    throw new DiagnosticError('INVALID_PAGE_REQUEST', 'input');
+  }
+  const variables = { id: saleId, pageArgs: { size, offset },
     sortBy: null, filterBy: [], facetOptions: [], maxResults: null };
   const query = new URLSearchParams({ operationName: 'categoryGridRetrieve',
     variables: JSON.stringify(variables),
@@ -50,8 +53,9 @@ export function apiUrl(sha256Hash) {
   return `${endpoint}?${query}`;
 }
 
-export function validateFirstPage(payload) {
-  const fail = code => { throw new DiagnosticError(code, 'first-page-validation'); };
+export function validatePage(payload, { offset = 0, requestedSize = pageSize, firstPageOnly = false,
+  deriveProductUrls = false, expectedTotalCount = null } = {}) {
+  const fail = code => { throw new DiagnosticError(code, firstPageOnly ? 'first-page-validation' : 'page-validation'); };
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) fail('SCHEMA_MISMATCH');
   if (payload.errors !== undefined) {
     if (!Array.isArray(payload.errors)) fail('SCHEMA_MISMATCH');
@@ -61,29 +65,49 @@ export function validateFirstPage(payload) {
   if (!grid || grid.id !== saleId || !Array.isArray(grid.products)) fail('SCHEMA_MISMATCH');
   const info = grid.pageInfo;
   if (!info || !['totalCount', 'size', 'offset'].every(key => Number.isSafeInteger(info[key]) && info[key] >= 0) ||
-      info.offset !== 0 || info.size !== pageSize ||
+      info.offset !== offset || info.size < 1 || info.size > requestedSize ||
+      (firstPageOnly && info.size !== requestedSize) ||
       (info.isLast !== undefined && typeof info.isLast !== 'boolean')) fail('INVALID_PAGE_INFO');
+  if (expectedTotalCount !== null && info.totalCount !== expectedTotalCount) fail('TOTAL_COUNT_CHANGED');
   if (info.totalCount === 0 && grid.products.length === 0) fail('EMPTY_CATEGORY');
-  if (grid.products.length !== Math.min(info.totalCount, info.size)) fail('INCONSISTENT_FIRST_PAGE');
-  if (info.isLast !== undefined && info.isLast !== (grid.products.length === info.totalCount)) fail('INCONSISTENT_FIRST_PAGE');
+  if (offset >= info.totalCount || grid.products.length !== Math.min(info.totalCount - offset, info.size)) {
+    fail(firstPageOnly ? 'INCONSISTENT_FIRST_PAGE' : 'INCONSISTENT_PAGE');
+  }
+  if (info.isLast !== undefined && info.isLast !== (offset + grid.products.length === info.totalCount)) {
+    fail(firstPageOnly ? 'INCONSISTENT_FIRST_PAGE' : 'INCONSISTENT_PAGE');
+  }
   const products = grid.products.map(product => {
     if (!product || typeof product.id !== 'string' || !product.id.trim() ||
         typeof product.name !== 'string' || !product.name.trim()) fail('INVALID_PRODUCT');
+    const media = Array.isArray(product.media) ? product.media.map(item => ({
+      type: item?.type ?? null, role: item?.role ?? null, url: item?.url ?? null,
+    })) : null;
+    const apiProductUrl = typeof product.url === 'string' && /^https:\/\//.test(product.url) ? product.url : null;
+    // Official /[locale]/product/[productId] route verified on 2026-10-20:
+    // HTTP 200 and matching Next.js productId/statusCode (docs/POC_REPORT.md).
+    const derivedUrl = deriveProductUrls && /^[A-Z0-9]+-[A-Z0-9_-]+$/.test(product.id) ?
+      `https://store.playstation.com/${locale}/product/${product.id}` : null;
+    const image = media?.find(item => item.type === 'IMAGE' && item.role === 'MASTER' && /^https:\/\//.test(item.url)) ??
+      media?.find(item => item.type === 'IMAGE' && /^https:\/\//.test(item.url));
     return {
       key: `${locale}:${product.id}`, id: product.id, name: product.name,
-      url: typeof product.url === 'string' && /^https:\/\//.test(product.url) ? product.url : null,
+      url: apiProductUrl ?? derivedUrl,
+      urlSource: apiProductUrl ? 'api' : derivedUrl ? 'verified-product-route' : null,
+      imageUrl: image?.url ?? null,
       platforms: Array.isArray(product.platforms) ? product.platforms : null,
       price: product.price && typeof product.price === 'object' ? {
         basePrice: product.price.basePrice ?? null,
         discountedPrice: product.price.discountedPrice ?? null,
         discountText: product.price.discountText ?? null,
       } : null,
-      media: Array.isArray(product.media) ? product.media.map(item => ({
-        type: item?.type ?? null, role: item?.role ?? null, url: item?.url ?? null,
-      })) : null,
+      media,
     };
   });
   const uniqueProductCount = new Set(products.map(product => product.key)).size;
   return { pageInfo: info, rawProductCount: products.length, uniqueProductCount,
     duplicateProductCount: products.length - uniqueProductCount, products };
+}
+
+export function validateFirstPage(payload) {
+  return validatePage(payload, { firstPageOnly: true });
 }

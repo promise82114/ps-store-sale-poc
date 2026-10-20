@@ -29,20 +29,23 @@ export function retryDelay(value, now = Date.now()) {
   return Number.isFinite(seconds) && seconds >= 0 && seconds <= 30 ? Math.max(1000, seconds * 1000) : null;
 }
 
-export function createClient(requests, { fetchImpl = fetch, wait = sleep } = {}) {
+export function createClient(requests, { fetchImpl = fetch, wait = sleep, minimumIntervalMs = 750 } = {}) {
   let lastRequest = 0;
-  return async function get(url, stage, { json = false } = {}) {
+  return async function get(url, stage, { json = false, offset, size, deadlineAt = Infinity } = {}) {
     for (let attempt = 1; attempt <= 3; attempt++) {
-      await wait(Math.max(0, 350 - (Date.now() - lastRequest)));
+      await wait(Math.max(0, minimumIntervalMs - (Date.now() - lastRequest)));
+      if (Date.now() >= deadlineAt) throw new DiagnosticError('RUN_BUDGET_EXCEEDED', stage);
       lastRequest = Date.now();
       const started = Date.now();
       const event = { stage, attempt, httpStatus: null, durationMs: null, failureCode: null };
+      if (Number.isSafeInteger(offset)) event.offset = offset;
+      if (Number.isSafeInteger(size)) event.requestedSize = size;
       requests.push(event);
       let response, text;
       try {
         response = await fetchImpl(url, {
           method: 'GET', redirect: 'manual', credentials: 'omit',
-          signal: AbortSignal.timeout(20_000),
+          signal: AbortSignal.timeout(Math.max(1, Math.min(20_000, deadlineAt - Date.now()))),
           headers: { Accept: json ? 'application/json' : '*/*',
             'User-Agent': 'ps-store-poc01/0.1',
             ...(json ? { 'Content-Type': 'application/json', 'X-PSN-Store-Locale-Override': 'zh-hant-tw' } : {}) },

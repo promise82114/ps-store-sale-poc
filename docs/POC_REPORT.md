@@ -1,14 +1,15 @@
-# POC-01 Task 01 / Task 02 實作與驗證狀態
+# POC-01 實作與驗證報告
 
-## 目前結論：PASS（僅 Task 01 / Task 02）
+## 目前結論：INCONCLUSIVE（Task 03–05 尚待完整雲端驗收）
 
-Task 01 腳手架與 Task 02 單頁診斷已在 GitHub-hosted runner 通過，兩次 Run 的 artifact 均已實際下載並核對。此結果只證明環境流程及未登入取得第一頁商品；完整分頁與 Task 03–05 未開始。
+Task 01 腳手架與 Task 02 單頁診斷已在 GitHub-hosted runner 通過，兩次 Run 的 artifact 均已實際下載並核對。Task 03、04 已沿用現有程式實作完整分頁與商品輸出，必要離線測試已通過；Task 05 正在補齊完整模式的雲端證據。下方保留先前單頁實測記錄。
 
 | 項目 | 本機驗證 | GitHub-hosted runner |
 |---|---|---|
 | Task 01 環境檢查 | PASS | PASS，診斷 artifact 已下載核對 |
 | Task 02 第一頁 | PASS，HTTP 200，24 筆有效商品 | PASS，HTTP 200，24 筆有效商品 |
-| 完整分頁 | 未執行，不在此次範圍 | 未執行 |
+| 完整分頁與 JSON | 離線合成資料 PASS；未執行本機完整活動抓取 | 待執行 |
+| 完整 Artifact 下載驗證 | 未取得雲端完整檔案 | 待執行 |
 
 ## 本機實測記錄
 
@@ -42,7 +43,7 @@ Task 01 腳手架與 Task 02 單頁診斷已在 GitHub-hosted runner 通過，�
 
 開發時先發現新版 GraphQL 列印格式與官方不同，計算出的 hash 被回覆 HTTP 400 `not whitelisted`；依官方單行參數及結尾換行格式修正後，再補上公開 API 要求的一般 JSON Content-Type 標頭，最終單頁成功。未嘗試替代代理、登入憑證或封鎖繞過。
 
-執行時從當前官方頁面重新提取定義；此記錄與測試 fixture 都不作為失敗 fallback。若官方查詢／打包／hash 算法改動，應停止並人工核對。尚未驗證完整分頁、抓取期間總數穩定性或正式公開使用限制。
+執行時從當前官方頁面重新提取定義；此記錄與測試 fixture 都不作為失敗 fallback。若官方查詢／打包／hash 算法改動，應停止並人工核對。完整分頁與首尾重驗結果將另列下方；正式公開使用限制尚未驗證。
 
 ## GitHub-hosted runner 實測
 
@@ -70,3 +71,28 @@ Task 02 共 4 次請求（官方活動 HTML、2 份公開腳本、GraphQL 第一
 下載副本保存在本機忽略追蹤的 `.local/cloud-environment/`、`.local/cloud-first-page/`；Repo 僅提交此文字記錄，商品資料仍由 artifact 提供，保留 7 天。
 
 重現及 artifact 判讀步驟見 [README](../README.md)。
+
+## Task 03–05：完整模式驗證
+
+### 本機離線測試
+
+- 2026-10-20，Windows x64、Node.js v20.18.0；52 / 52 項測試通過。測試使用合成商品與官方查詢快照，沒有對 PS Store 執行完整活動抓取。
+- 保留原 25 項測試，新增動態總數、整除／非整除尾頁、實際 size 推進、缺省 isLast、總數增減、首尾 ID 變動與最多兩輪重抓。
+- 驗證重複 ID 的出現次數／唯一數、無進展、錯誤 offset／size、空頁、矛盾 isLast、頁數／時間上限與 HTTP 重試上限。
+- 透過離線完整執行驗證 JSON schema、完整成功檔、分離的 partial 檔、舊檔／暫存檔清理、非零失敗、不留敏感資料及既有單頁模式相容性。
+- 完整抓取限制：依序、開始間隔至少 750ms、單次逾時 20 秒、網路／5xx／429 最多 3 次、Retry-After 上限 30 秒、每輪最多 500 頁、最多 2 輪、共用抓取預算 8 分鐘、job 15 分鐘。
+- 總數／首尾商品變動時最多重抓一次且捨棄前輪資料；其他結構或存取錯誤停止。完整商品數、唯一數及總數一致並通過首尾重驗後，才以暫存檔更名產生 `sale-products.json`。
+
+### 商品網址來源驗證（本機公開頁面）
+
+2026-10-20T07:16:13.448432Z，以未登入 HTTP GET 取得下列官方商品頁，HTTP 200、最終 URL 相同；頁面 `__NEXT_DATA__` 的 `pageProps.productId` 與商品 ID 相符、`statusCode=200`、`isLoggedIn=false`，路由為 `/[locale]/product/[productId]`：
+
+[官方商品頁](https://store.playstation.com/zh-hant-tw/product/JP9000-PPSA15595_00-MTFSUE0000000000)
+
+因此完整輸出可對符合安全 Product ID 字元格式的商品使用此已驗證路徑規則，標示 `urlSource=verified-product-route`。這不是逐筆商品頁可用性驗證；未新增逐筆請求。
+
+### GitHub-hosted runner 完整抓取
+
+待執行 `mode=full`，下載 artifact 後記錄 Run、commit、時間、各頁狀態、商品原始／唯一／重複數、耗時、錯誤、首尾重驗及完整 JSON 下載檢核結果。
+
+完整模式通過前，整體結論維持 INCONCLUSIVE。此 POC 不提交正式公開商品 JSON，也不開始 POC-02、POC-03 或正式網站。

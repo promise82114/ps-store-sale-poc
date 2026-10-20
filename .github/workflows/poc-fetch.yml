@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Task 01 environment check or Task 02 first-page diagnostic
+        description: Environment check, first-page diagnostic, or full activity fetch
         required: true
         default: environment
         type: choice
         options:
           - environment
           - first-page
+          - full
       sale_url:
         description: Allowlisted Taiwan sale URL (first page only)
         required: true
