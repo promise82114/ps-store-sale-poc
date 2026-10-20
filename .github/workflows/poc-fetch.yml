@@ -1,0 +1,88 @@
+name: POC 01 - PS Store diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Task 01 environment check or Task 02 first-page diagnostic
+        required: true
+        default: environment
+        type: choice
+        options:
+          - environment
+          - first-page
+      sale_url:
+        description: Allowlisted Taiwan sale URL (first page only)
+        required: true
+        type: string
+        default: https://store.playstation.com/zh-hant-tw/category/10f8c20b-f1b4-4814-ad6a-acb122e4ab04/1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ps-store-poc01-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout POC repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Initialize environment artifact
+        run: |
+          mkdir -p artifacts
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          writeFileSync('artifacts/bootstrap.json', JSON.stringify({
+            schemaVersion: 1,
+            scope: 'environment-bootstrap-only',
+            startedAt: new Date().toISOString(),
+            node: process.version,
+            os: process.platform,
+            runnerEnvironment: process.env.RUNNER_ENVIRONMENT,
+            runUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            authenticationUsed: false,
+            complete: false
+          }, null, 2));
+          NODE
+
+      - name: Install locked dependency
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run offline validation tests
+        run: npm test
+
+      - name: Run selected diagnostic
+        env:
+          POC_MODE: ${{ inputs.mode }}
+          SALE_URL: ${{ inputs.sale_url }}
+        run: node src/poc-fetch.mjs --mode "$POC_MODE"
+
+      - name: Publish readable diagnostic to run summary
+        if: always()
+        run: |
+          if [ -f artifacts/POC_REPORT.md ]; then
+            cat artifacts/POC_REPORT.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Diagnostic did not finish. Inspect the failed setup/test step and bootstrap artifact.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: poc01-${{ inputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          retention-days: 7
+          if-no-files-found: error

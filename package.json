@@ -1,0 +1,18 @@
+{
+  "name": "ps-store-sale-poc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Unauthenticated PS Store first-page diagnostic, Tasks 01 and 02 only",
+  "engines": {
+    "node": ">=20.18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node src/poc-fetch.mjs --mode environment",
+    "diagnose": "node src/poc-fetch.mjs --mode first-page"
+  },
+  "dependencies": {
+    "graphql": "15.10.3"
+  }
+}
