@@ -1,5 +1,7 @@
 # PS Store POC-01 — 公開活動商品擷取驗證
 
+換機或接續開發請先讀 [docs/HANDOFF.md](docs/HANDOFF.md)，包含 POC-04 現況、新電腦還原、驗證步驟與資料移轉界線。
+
 獨立測試 Repo，驗證 **GitHub-hosted runner 能否不登入 PSN，取得指定台灣活動的全部商品**。
 沿用 Task 01、02 已通過的查詢，提供環境檢查、單頁診斷與完整活動抓取。產物僅供 POC Artifact 驗證。
 
@@ -81,4 +83,19 @@ Workflow 僅 `workflow_dispatch`、`contents: read`，使用 GitHub-hosted `ubun
 不設定排程、push 觸發、Repo secrets、PAT、寫入權限、JSON commit、Pages 部署或正式專案操作。Actions 固定到已核對的官方 action commit。
 報告與本機下載的診斷資料均被 `.gitignore` 排除。
 
-POC 僅測試 Artifact，不進入 POC-02、POC-03 或正式網站。實際 Run 連結、數量與 artifact 驗證結果見 [docs/POC_REPORT.md](docs/POC_REPORT.md)。
+POC-01 僅測試 Artifact，不進入 POC-02、POC-03 或正式網站。實際 Run 連結、數量與 artifact 驗證結果見 [docs/POC_REPORT.md](docs/POC_REPORT.md)。
+
+## POC-04：個人資料、三方合併與離線同步驗證
+
+P04-01～04 使用合成資料，沿用現有格式與合併引擎，新增最小原生 IndexedDB adapter 及強制注入 Mock 的 Drive transport。沒有 OAuth、真實 Google Drive 或正式網站，也沒有新增依賴。
+
+```powershell
+npm run test:poc04
+npm test
+npm run test:poc04:browser
+```
+
+第一個命令執行 POC-04 的 Node 測試；`npm test` 包含 POC-01 及 POC-04 的所有 Node 離線測試，不會啟動活動抓取。
+最後一個命令啟動只綁定 `127.0.0.1:4184` 的瀏覽器驗證伺服器；需另開兩個測試分頁及執行 reload，不能以 Node 測試代替原生 IDB 證據。
+操作步驟、資料格式、已確認的 Tombstone 規則、正式測試結果及停寫／恢復限制見 [docs/POC04_REPORT.md](docs/POC04_REPORT.md)。
+目前沒有執行 P04-05～07；本階段通過不代表真實 Drive 同步模組已完成。

@@ -8,7 +8,9 @@
     "node": ">=20.18"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test tests",
+    "test:poc04": "node --test tests/poc04-personal-data.test.mjs tests/poc04-merge.test.mjs tests/poc04-sync-state.test.mjs tests/poc04-transport.test.mjs",
+    "test:poc04:browser": "node tools/poc04-browser-server.mjs",
     "check": "node src/poc-fetch.mjs --mode environment",
     "diagnose": "node src/poc-fetch.mjs --mode first-page",
     "fetch:full": "node src/poc-fetch.mjs --mode full"
